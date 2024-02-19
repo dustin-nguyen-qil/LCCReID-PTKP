@@ -84,7 +84,7 @@ class RandomMultipleGallerySampler(Sampler):
         self.pid_index = defaultdict(list)
         self.num_instances = num_instances
 
-        for index, (_, pid, cam,frame) in enumerate(data_source):
+        for index, (_, pid, cam, fname) in enumerate(data_source):
             self.index_pid[index] = pid
             self.pid_cam[pid].append(cam)
             self.pid_index[pid].append(index)

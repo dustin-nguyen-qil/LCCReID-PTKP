@@ -20,7 +20,7 @@ def extract_features(model, data_loader):
 
     end = time.time()
     with torch.no_grad():
-        for i, (imgs, fnames, pids, cids, domians) in enumerate(data_loader):
+        for i, (imgs, fnames, pids, cids, domains) in enumerate(data_loader):
             data_time.update(time.time() - end)
 
             outputs = extract_cnn_feature(model, imgs)

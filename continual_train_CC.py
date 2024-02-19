@@ -20,20 +20,15 @@ from reid.models.resnet import build_resnet_backbone
 from reid.models.layers import DataParallel
 from reid.trainer import Trainer
 
+# training: prcc -> ltcc -> last, testing: real28, deepchange, celeblight, vcclothes
 
-def get_data(name, data_dir, height, width, batch_size, workers, num_instances):
-    root = osp.join(data_dir, name)
+def get_data(name, data_dir, height, width, batch_size, workers, num_instances, mode='test'):
+    # root = osp.join(data_dir, name)
 
-    dataset = datasets.create(name, root)
+    dataset = datasets.create(name, data_dir)
 
     normalizer = T.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])
-
-    train_set = sorted(dataset.train)
-
-    iters = int(len(train_set) / batch_size)
-    num_classes = dataset.num_train_pids
-
     train_transformer = T.Compose([
         T.Resize((height, width), interpolation=3),
         T.RandomHorizontalFlip(p=0.5),
@@ -50,26 +45,39 @@ def get_data(name, data_dir, height, width, batch_size, workers, num_instances):
         normalizer
     ])
 
-    rmgs_flag = num_instances > 0
-    if rmgs_flag:
-        sampler = RandomMultipleGallerySampler(train_set, num_instances)
-    else:
-        sampler = None
+    if mode == 'train':
+        train_set = sorted(dataset.train)
 
-    train_loader = IterLoader(
-        DataLoader(Preprocessor(train_set, root=dataset.images_dir,transform=train_transformer),
-                   batch_size=batch_size, num_workers=workers, sampler=sampler,
-                   shuffle=not rmgs_flag, pin_memory=True, drop_last=True), length=iters)
-
-    test_loader = DataLoader(
+        iters = int(len(train_set) / batch_size)
+        num_classes = dataset.num_train_pids
+        rmgs_flag = num_instances > 0
+        if rmgs_flag:
+            sampler = RandomMultipleGallerySampler(train_set, num_instances)
+        else:
+            sampler = None
+    
+        
+        train_loader = IterLoader(
+            DataLoader(Preprocessor(train_set, root=dataset.images_dir,transform=train_transformer),
+                    batch_size=batch_size, num_workers=workers, sampler=sampler,
+                    shuffle=not rmgs_flag, pin_memory=True, drop_last=True), length=iters)
+        
+        init_loader = DataLoader(Preprocessor(train_set, root=dataset.images_dir,transform=test_transformer),
+                        batch_size=128, num_workers=workers,shuffle=False, pin_memory=True, drop_last=False)
+        test_loader = DataLoader(
         Preprocessor(list(set(dataset.query) | set(dataset.gallery)),
-                     root=dataset.images_dir, transform=test_transformer),
+                    root=dataset.images_dir, transform=test_transformer),
         batch_size=batch_size, num_workers=workers, shuffle=False, pin_memory=True)
+        return dataset, num_classes, train_loader, test_loader, init_loader
+    
+    else:
+        test_loader = DataLoader(
+            Preprocessor(list(set(dataset.query) | set(dataset.gallery)),
+                        root=dataset.images_dir, transform=test_transformer),
+            batch_size=batch_size, num_workers=workers, shuffle=False, pin_memory=True)
 
-    init_loader = DataLoader(Preprocessor(train_set, root=dataset.images_dir,transform=test_transformer),
-                             batch_size=128, num_workers=workers,shuffle=False, pin_memory=True, drop_last=False)
-
-    return dataset, num_classes, train_loader, test_loader, init_loader
+   
+        return dataset, test_loader
 
 
 def get_test_loader(dataset, height, width, batch_size, workers, testset=None):
@@ -119,39 +127,31 @@ def main_worker(args):
     """
         Modify here with cloth-changing datasets
     """
-
     # Create data loaders
-    dataset_market, num_classes_market, train_loader_market, test_loader_market, _ = \
-        get_data('market1501', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_prcc, num_classes_prcc, train_loader_prcc, test_loader_prcc, _ = \
+        get_data('prcc', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances, mode='train')
 
-    dataset_duke, num_classes_duke, train_loader_duke, test_loader_duke, init_loader_duke = \
-        get_data('dukemtmc', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_ltcc, num_classes_ltcc, train_loader_ltcc, test_loader_ltcc, init_loader_ltcc = \
+        get_data('ltcc', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances, mode='train')
 
-    dataset_cuhksysu, num_classes_cuhksysu, train_loader_cuhksysu, test_loader_cuhksysu, init_loader_chuksysu = \
-        get_data('cuhk_sysu', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_last, num_classes_last, train_loader_last, test_loader_last,  init_loader_last = \
+        get_data('last', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances, mode='train')
 
-    dataset_msmt17, num_classes_msmt17, train_loader_msmt17, test_loader_msmt17, init_loader_msmt17 = \
-        get_data('msmt17', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
-
-    """
-        Modify here with cloth-changing datasets
-        Query loader of PRCC are different
-    """
     # Data loaders for test only
-    dataset_cuhk03, _, _, test_loader_cuhk03, _ = \
-        get_data('cuhk03', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_real28, test_loader_real28, = \
+        get_data('real28', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
 
-    dataset_cuhk01, _, _, test_loader_cuhk01, _ = \
-        get_data('cuhk01', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_vcclothes, test_loader_vcclothes = \
+        get_data('vcclothes', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
 
-    dataset_grid, _, _, test_loader_grid, _ = \
-        get_data('grid', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_celeblight, test_loader_celeblight= \
+        get_data('celeblight', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
 
-    dataset_sense, _, _, test_loader_sense, _ =\
-        get_data('sense', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
+    dataset_deepchange, test_loader_deepchange =\
+        get_data('deepchange', args.data_dir, args.height, args.width, args.batch_size, args.workers, args.num_instances)
 
     # Create model
-    model = build_resnet_backbone(num_class=num_classes_market, depth='50x')
+    model = build_resnet_backbone(num_class=num_classes_prcc, depth='50x')
     model.cuda()
     model = DataParallel(model)
 
@@ -179,44 +179,46 @@ def main_worker(args):
     # Start training
     print('Continual training starts!')
 
-    # Train Market-1501
-    trainer = Trainer(model, num_classes_market, margin=args.margin)
-    for epoch in range(start_epoch, 80):
+    # Train PRCC
+    trainer = Trainer(model, num_classes_prcc, margin=args.margin)
+    for epoch in range(start_epoch, 50):
 
-        train_loader_market.new_epoch()
-        trainer.train(epoch, train_loader_market, None, optimizer, training_phase=1,
-                      train_iters=len(train_loader_market), add_num=0, old_model=None, replay=False)
+        train_loader_prcc.new_epoch()
+        trainer.train(epoch, train_loader_prcc, None, optimizer, training_phase=1,
+                      train_iters=len(train_loader_prcc), add_num=0, old_model=None, replay=False)
         lr_scheduler.step()
 
         if ((epoch + 1) % 80 == 0):
-            _, mAP = evaluator.evaluate(test_loader_market, dataset_market.query, dataset_market.gallery, cmc_flag=True)
+
+            _, mAP = evaluator.evaluate(test_loader_prcc, dataset_prcc.query, dataset_prcc.gallery, cmc_flag=True)
 
             save_checkpoint({
                 'state_dict': model.state_dict(),
                 'epoch': epoch + 1,
                 'mAP': mAP,
-            }, True, fpath=osp.join(args.logs_dir, 'market_checkpoint.pth.tar'))
+            }, True, fpath=osp.join(args.logs_dir, 'prcc_checkpoint.pth.tar'))
 
-            print('Finished epoch {:3d}  Market-1501 mAP: {:5.1%} '.format(epoch, mAP))
+            print('Finished epoch {:3d}  PRCC mAP: {:5.1%} '.format(epoch, mAP))
 
             print('Testing on unseen tasks:')
-            print('Results on CUHK-01')
-            evaluator.evaluate(test_loader_cuhk01, dataset_cuhk01.query, dataset_cuhk01.gallery, cmc_flag=True)
-            print('Results on CUHK-03')
-            evaluator.evaluate(test_loader_cuhk03, dataset_cuhk03.query, dataset_cuhk03.gallery, cmc_flag=True)
-            #evaluator.evaluate(test_loader_grid, dataset_grid.query, dataset_grid.gallery, cmc_flag=True)
-            print('Results on SenseReID')
-            evaluator.evaluate(test_loader_sense, dataset_sense.query, dataset_sense.gallery, cmc_flag=True)
+            print('Results on VC-Clothes')
+            evaluator.evaluate(test_loader_vcclothes, dataset_vcclothes.query, dataset_vcclothes.gallery, cmc_flag=True)
+            print('Results on Real28')
+            evaluator.evaluate(test_loader_real28, dataset_real28.query, dataset_real28.gallery, cmc_flag=True)
+            print('Resules on CelebLight')
+            evaluator.evaluate(test_loader_celeblight, dataset_celeblight.query, dataset_celeblight.gallery, cmc_flag=True)
+            print('Results on DeepChange')
+            evaluator.evaluate(test_loader_deepchange, dataset_deepchange.query, dataset_deepchange.gallery, cmc_flag=True)
 
-    # Select replay data of market-1501
-    replay_dataloader, market_replay_dataset = select_replay_samples(model, dataset_market, training_phase=1)
+    # Select replay data of prcc
+    replay_dataloader, prcc_replay_dataset = select_replay_samples(model, dataset_prcc, training_phase=1)
 
     # Expand the dimension of classifier
     org_classifier_params = model.module.classifier.weight.data
-    model.module.classifier = nn.Linear(2048, num_classes_duke + num_classes_market, bias=False)
+    model.module.classifier = nn.Linear(2048, num_classes_ltcc + num_classes_prcc, bias=False)
     model.cuda()
-    model.module.classifier.weight.data[:num_classes_market].copy_(org_classifier_params)
-    add_num = num_classes_market
+    model.module.classifier.weight.data[:num_classes_prcc].copy_(org_classifier_params)
+    add_num = num_classes_prcc
 
     # Create old frozen model
     old_model = copy.deepcopy(model)
@@ -224,8 +226,8 @@ def main_worker(args):
     old_model.eval()
 
     # Initialize classifer with class centers
-    class_centers = initial_classifier(model, init_loader_duke)
-    model.module.classifier.weight.data[num_classes_market:].copy_(class_centers)
+    class_centers = initial_classifier(model, init_loader_ltcc)
+    model.module.classifier.weight.data[num_classes_prcc:].copy_(class_centers)
 
     # Re-initialize optimizer
     params = []
@@ -236,56 +238,57 @@ def main_worker(args):
     optimizer = torch.optim.Adam(params)
     lr_scheduler = WarmupMultiStepLR(optimizer, [30], gamma=0.1, warmup_factor=0.01, warmup_iters=args.warmup_step)
 
-    trainer = Trainer(model, num_classes_duke + num_classes_market, margin=args.margin)
+    trainer = Trainer(model, num_classes_ltcc + num_classes_prcc, margin=args.margin)
 
     for epoch in range(start_epoch, args.epochs):
 
-        train_loader_duke.new_epoch()
-        trainer.train(epoch, train_loader_duke, replay_dataloader, optimizer, training_phase=2,
-                      train_iters=len(train_loader_duke), add_num=add_num, old_model=old_model, replay=True)
+        train_loader_ltcc.new_epoch()
+        trainer.train(epoch, train_loader_ltcc, replay_dataloader, optimizer, training_phase=2,
+                      train_iters=len(train_loader_ltcc), add_num=add_num, old_model=old_model, replay=True)
         lr_scheduler.step()
 
         if ((epoch + 1) % args.epochs == 0):
 
-            _, mAP_market = evaluator.evaluate(test_loader_market, dataset_market.query, dataset_market.gallery,
+            _, mAP_prcc = evaluator.evaluate(test_loader_prcc, dataset_prcc.query, dataset_prcc.gallery,
                                                cmc_flag=True)
 
-            print('Finished epoch {:3d}  Market-1501 mAP: {:5.1%}'.format(epoch, mAP_market))
+            print('Finished epoch {:3d}  PRCC mAP: {:5.1%}'.format(epoch, mAP_prcc))
 
-            _, mAP_duke = evaluator.evaluate(test_loader_duke, dataset_duke.query, dataset_duke.gallery,
+            _, mAP_ltcc = evaluator.evaluate(test_loader_ltcc, dataset_ltcc.query, dataset_ltcc.gallery,
                                              cmc_flag=True)
 
             save_checkpoint({
                 'state_dict': model.state_dict(),
                 'epoch': epoch + 1,
-                'mAP': mAP_duke,
-            }, True, fpath=osp.join(args.logs_dir, 'duke_checkpoint.pth.tar'))
+                'mAP': mAP_ltcc,
+            }, True, fpath=osp.join(args.logs_dir, 'ltcc_checkpoint.pth.tar'))
 
-            print('Finished epoch {:3d}  DukeMTMC mAP: {:5.1%}'.format(epoch, mAP_duke))
+            print('Finished epoch {:3d}  LTCC mAP: {:5.1%}'.format(epoch, mAP_ltcc))
 
             print('Testing on unseen tasks')
-            print('Results on CUHK-01')
-            evaluator.evaluate(test_loader_cuhk01, dataset_cuhk01.query, dataset_cuhk01.gallery, cmc_flag=True)
-            print('Results on CUHK-03')
-            evaluator.evaluate(test_loader_cuhk03, dataset_cuhk03.query, dataset_cuhk03.gallery, cmc_flag=True)
-            # evaluator.evaluate(test_loader_grid, dataset_grid.query, dataset_grid.gallery, cmc_flag=True)
-            print('Results on SenseReID')
-            evaluator.evaluate(test_loader_sense, dataset_sense.query, dataset_sense.gallery, cmc_flag=True)
+            print('Results on VC-Clothes')
+            evaluator.evaluate(test_loader_vcclothes, dataset_vcclothes.query, dataset_vcclothes.gallery, cmc_flag=True)
+            print('Results on Real28')
+            evaluator.evaluate(test_loader_real28, dataset_real28.query, dataset_real28.gallery, cmc_flag=True)
+            print('Results on CelebLight')
+            evaluator.evaluate(test_loader_celeblight, dataset_celeblight.query, dataset_celeblight.gallery, cmc_flag=True)
+            print('Results on DeepChange')
+            evaluator.evaluate(test_loader_deepchange, dataset_deepchange.query, dataset_deepchange.gallery, cmc_flag=True)
 
-    # Select replay data of DukeMTMC
-    replay_dataloader, duke_replay_dataset = select_replay_samples(model, dataset_duke, training_phase=2,
-                                                  add_num=add_num, old_datas=market_replay_dataset)
+    # Select replay data of LTCC
+    replay_dataloader, ltcc_replay_dataset = select_replay_samples(model, dataset_ltcc, training_phase=2,
+                                                  add_num=add_num, old_datas=prcc_replay_dataset)
 
     # Expand the dimension of classifier
     org_classifier_params = model.module.classifier.weight.data
-    model.module.classifier = nn.Linear(2048, num_classes_duke + num_classes_market + num_classes_cuhksysu, bias=False)
-    model.module.classifier.weight.data[:(num_classes_market + num_classes_duke)].copy_(org_classifier_params)
+    model.module.classifier = nn.Linear(2048, num_classes_ltcc + num_classes_prcc + num_classes_last, bias=False)
+    model.module.classifier.weight.data[:(num_classes_prcc + num_classes_ltcc)].copy_(org_classifier_params)
     model.cuda()
-    add_num = num_classes_market + num_classes_duke
+    add_num = num_classes_prcc + num_classes_ltcc
 
     # Initialize classifer with class centers
-    class_centers = initial_classifier(model, init_loader_chuksysu)
-    model.module.classifier.weight.data[(num_classes_market + num_classes_duke):].copy_(class_centers)
+    class_centers = initial_classifier(model,  init_loader_last)
+    model.module.classifier.weight.data[(num_classes_prcc + num_classes_ltcc):].copy_(class_centers)
     model.cuda()
 
     # Create old frozen model
@@ -302,124 +305,125 @@ def main_worker(args):
     optimizer = torch.optim.Adam(params)
     lr_scheduler = WarmupMultiStepLR(optimizer, [30], gamma=0.1, warmup_factor=0.01, warmup_iters=args.warmup_step)
 
-    trainer = Trainer(model, num_classes_cuhksysu + add_num, margin=args.margin)
+    trainer = Trainer(model, num_classes_last + add_num, margin=args.margin)
 
     for epoch in range(start_epoch, args.epochs):
 
-        train_loader_cuhksysu.new_epoch()
-        trainer.train(epoch, train_loader_cuhksysu, replay_dataloader, optimizer, training_phase=3,
-                      train_iters=len(train_loader_cuhksysu), add_num=add_num, old_model=old_model, replay=True)
+        train_loader_last.new_epoch()
+        trainer.train(epoch, train_loader_last, replay_dataloader, optimizer, training_phase=3,
+                      train_iters=len(train_loader_last), add_num=add_num, old_model=old_model, replay=True)
         lr_scheduler.step()
 
         if ((epoch + 1) % args.epochs == 0):
 
-            _, mAP_market = evaluator.evaluate(test_loader_market, dataset_market.query, dataset_market.gallery, cmc_flag=True)
+            _, mAP_prcc = evaluator.evaluate(test_loader_prcc, dataset_prcc.query, dataset_prcc.gallery, cmc_flag=True)
 
-            print('Finished epoch {:3d}  Market-1501 mAP: {:5.1%}'.format(epoch, mAP_market))
+            print('Finished epoch {:3d}  PRCC mAP: {:5.1%}'.format(epoch, mAP_prcc))
 
-            _, mAP_duke = evaluator.evaluate(test_loader_duke, dataset_duke.query, dataset_duke.gallery,
+            _, mAP_ltcc = evaluator.evaluate(test_loader_ltcc, dataset_ltcc.query, dataset_ltcc.gallery,
                                                cmc_flag=True,)
 
-            print('Finished epoch {:3d}  DukeMTMC mAP: {:5.1%}'.format(epoch, mAP_duke))
+            print('Finished epoch {:3d}  LTCC mAP: {:5.1%}'.format(epoch, mAP_ltcc))
 
-            _, mAP_cuhk = evaluator.evaluate(test_loader_cuhksysu, dataset_cuhksysu.query, dataset_cuhksysu.gallery,
+            _, mAP_last = evaluator.evaluate(test_loader_last, dataset_last.query, dataset_last.gallery,
                                                cmc_flag=True)
 
             save_checkpoint({
                 'state_dict': model.state_dict(),
                 'epoch': epoch + 1,
-                'mAP': mAP_cuhk,
-            }, True, fpath=osp.join(args.logs_dir, 'cuhksysu_checkpoint.pth.tar'))
+                'mAP': mAP_last,
+            }, True, fpath=osp.join(args.logs_dir, 'last_checkpoint.pth.tar'))
 
-            print('Finished epoch {:3d}  CUHKSYSU mAP: {:5.1%}'.format(epoch, mAP_cuhk))
-
-            print('Testing on unseen tasks')
-            print('Results on CUHK-01')
-            evaluator.evaluate(test_loader_cuhk01, dataset_cuhk01.query, dataset_cuhk01.gallery, cmc_flag=True)
-            print('Results on CUHK-03')
-            evaluator.evaluate(test_loader_cuhk03, dataset_cuhk03.query, dataset_cuhk03.gallery, cmc_flag=True)
-            # evaluator.evaluate(test_loader_grid, dataset_grid.query, dataset_grid.gallery, cmc_flag=True)
-            print('Results on SenseReID')
-            evaluator.evaluate(test_loader_sense, dataset_sense.query, dataset_sense.gallery, cmc_flag=True)
-
-    # Select replay data of CUHK-SYSU
-    sysu_replay_dataloader, sysu_replay_dataset = select_replay_samples(model, dataset_cuhksysu, training_phase=3,
-                                                     add_num=add_num,old_datas=duke_replay_dataset)
-
-    # Expand the dimension of classifier
-    org_classifier_params = model.module.classifier.weight.data
-    model.module.classifier = nn.Linear(2048, num_classes_duke + num_classes_market +
-                                        num_classes_cuhksysu + num_classes_msmt17, bias=False)
-    model.module.classifier.weight.data[:num_classes_market + num_classes_duke
-                                         + num_classes_cuhksysu].copy_(org_classifier_params)
-    add_num = num_classes_market + num_classes_duke + num_classes_cuhksysu
-    model.cuda()
-
-    # Initialize classifer with class centers
-    class_centers = initial_classifier(model, init_loader_msmt17)
-    model.module.classifier.weight.data[(num_classes_market + num_classes_duke
-                                         + num_classes_cuhksysu):].copy_(class_centers)
-    model.cuda()
-
-    # Create old frozen model
-    old_model = copy.deepcopy(model)
-    old_model = old_model.cuda()
-    old_model.eval()
-
-    # Re-initialize optimizer
-    params = []
-    for key, value in model.named_params(model):
-        if not value.requires_grad:
-            continue
-        params += [{"params": [value], "lr": args.lr * 0.1, "weight_decay": args.weight_decay}]
-    optimizer = torch.optim.Adam(params)
-    lr_scheduler = WarmupMultiStepLR(optimizer, [20, 30], gamma=0.1, warmup_factor=0.01, warmup_iters=args.warmup_step)
-
-    trainer = Trainer(model, num_classes_msmt17 + add_num, margin=args.margin)
-
-    for epoch in range(start_epoch, args.epochs):
-
-        train_loader_msmt17.new_epoch()
-        trainer.train(epoch, train_loader_msmt17, replay_dataloader, optimizer, training_phase=4,
-                      train_iters=len(train_loader_msmt17), add_num=add_num, old_model=old_model, replay=True)
-        lr_scheduler.step()
-
-        if ((epoch + 1) >= 30 and (epoch + 1) % 10 == 0):
-
-            _, mAP_market = evaluator.evaluate(test_loader_market, dataset_market.query, dataset_market.gallery,
-                                        cmc_flag=True)
-
-            print('Finished epoch {:3d}  Market-1501 mAP: {:5.1%}'.format(epoch, mAP_market))
-
-            _, mAP_duke = evaluator.evaluate(test_loader_duke, dataset_duke.query, dataset_duke.gallery,
-                                               cmc_flag=True)
-
-            print('Finished epoch {:3d}  DukeMTMC mAP: {:5.1%}'.format(epoch, mAP_duke))
-
-            _, mAP_cuhk = evaluator.evaluate(test_loader_cuhksysu, dataset_cuhksysu.query, dataset_cuhksysu.gallery,
-                                               cmc_flag=True)
-
-            print('Finished epoch {:3d}  CUHKSYSU mAP: {:5.1%}'.format(epoch, mAP_cuhk))
-
-            _, mAP_msmt = evaluator.evaluate(test_loader_msmt17, dataset_msmt17.query, dataset_msmt17.gallery,
-                                               cmc_flag=True)
-
-            save_checkpoint({
-                'state_dict': model.state_dict(),
-                'epoch': epoch + 1,
-                'mAP': mAP_msmt,
-            }, True, fpath=osp.join(args.logs_dir, 'msmt17_checkpoint.pth.tar'))
-
-            print('Finished epoch {:3d}  MSMT17 mAP: {:5.1%}'.format(epoch, mAP_msmt))
+            print('Finished epoch {:3d}  LaST mAP: {:5.1%}'.format(epoch, mAP_last))
 
             print('Testing on unseen tasks')
-            print('Results on CUHK-01')
-            evaluator.evaluate(test_loader_cuhk01, dataset_cuhk01.query, dataset_cuhk01.gallery, cmc_flag=True)
-            print('Results on CUHK-03')
-            evaluator.evaluate(test_loader_cuhk03, dataset_cuhk03.query, dataset_cuhk03.gallery, cmc_flag=True)
-            # evaluator.evaluate(test_loader_grid, dataset_grid.query, dataset_grid.gallery, cmc_flag=True)
-            print('Results on SenseReID')
-            evaluator.evaluate(test_loader_sense, dataset_sense.query, dataset_sense.gallery, cmc_flag=True)
+            print('Results on VC-Clothes')
+            evaluator.evaluate(test_loader_vcclothes, dataset_vcclothes.query, dataset_vcclothes.gallery, cmc_flag=True)
+            print('Results on Real28')
+            evaluator.evaluate(test_loader_real28, dataset_real28.query, dataset_real28.gallery, cmc_flag=True)
+            print('Results on CelebLight')
+            evaluator.evaluate(test_loader_celeblight, dataset_celeblight.query, dataset_celeblight.gallery, cmc_flag=True)
+            print('Results on DeepChange')
+            evaluator.evaluate(test_loader_deepchange, dataset_deepchange.query, dataset_deepchange.gallery, cmc_flag=True)
+
+    # Select replay data of LaST
+    sysu_replay_dataloader, sysu_replay_dataset = select_replay_samples(model, dataset_last, training_phase=3,
+                                                     add_num=add_num,old_datas=ltcc_replay_dataset)
+
+    # # Expand the dimension of classifier
+    # org_classifier_params = model.module.classifier.weight.data
+    # model.module.classifier = nn.Linear(2048, num_classes_ltcc + num_classes_prcc +
+    #                                     num_classes_last + num_classes_msmt17, bias=False)
+    # model.module.classifier.weight.data[:num_classes_prcc + num_classes_ltcc
+    #                                      + num_classes_last].copy_(org_classifier_params)
+    # add_num = num_classes_prcc + num_classes_ltcc + num_classes_last
+    # model.cuda()
+
+    # # Initialize classifer with class centers
+    # class_centers = initial_classifier(model, init_loader_msmt17)
+    # model.module.classifier.weight.data[(num_classes_prcc + num_classes_ltcc
+    #                                      + num_classes_last):].copy_(class_centers)
+    # model.cuda()
+
+    # # Create old frozen model
+    # old_model = copy.deepcopy(model)
+    # old_model = old_model.cuda()
+    # old_model.eval()
+
+    # # Re-initialize optimizer
+    # params = []
+    # for key, value in model.named_params(model):
+    #     if not value.requires_grad:
+    #         continue
+    #     params += [{"params": [value], "lr": args.lr * 0.1, "weight_decay": args.weight_decay}]
+    # optimizer = torch.optim.Adam(params)
+    # lr_scheduler = WarmupMultiStepLR(optimizer, [20, 30], gamma=0.1, warmup_factor=0.01, warmup_iters=args.warmup_step)
+
+    # trainer = Trainer(model, num_classes_msmt17 + add_num, margin=args.margin)
+
+    # for epoch in range(start_epoch, args.epochs):
+
+    #     train_loader_msmt17.new_epoch()
+    #     trainer.train(epoch, train_loader_msmt17, replay_dataloader, optimizer, training_phase=4,
+    #                   train_iters=len(train_loader_msmt17), add_num=add_num, old_model=old_model, replay=True)
+    #     lr_scheduler.step()
+
+    #     if ((epoch + 1) >= 30 and (epoch + 1) % 10 == 0):
+
+    #         _, mAP_prcc = evaluator.evaluate(test_loader_prcc, dataset_prcc.query, dataset_prcc.gallery,
+    #                                     cmc_flag=True)
+
+    #         print('Finished epoch {:3d}  PRCC mAP: {:5.1%}'.format(epoch, mAP_prcc))
+
+    #         _, mAP_ltcc = evaluator.evaluate(test_loader_ltcc, dataset_ltcc.query, dataset_ltcc.gallery,
+    #                                            cmc_flag=True)
+
+    #         print('Finished epoch {:3d}  LTCC mAP: {:5.1%}'.format(epoch, mAP_ltcc))
+
+    #         _, mAP_last = evaluator.evaluate(test_loader_last, dataset_last.query, dataset_last.gallery,
+    #                                            cmc_flag=True)
+
+    #         print('Finished epoch {:3d}  LaST mAP: {:5.1%}'.format(epoch, mAP_last))
+
+    #         _, mAP_msmt = evaluator.evaluate(test_loader_msmt17, dataset_msmt17.query, dataset_msmt17.gallery,
+    #                                            cmc_flag=True)
+
+    #         save_checkpoint({
+    #             'state_dict': model.state_dict(),
+    #             'epoch': epoch + 1,
+    #             'mAP': mAP_msmt,
+    #         }, True, fpath=osp.join(args.logs_dir, 'msmt17_checkpoint.pth.tar'))
+
+    #         print('Finished epoch {:3d}  MSMT17 mAP: {:5.1%}'.format(epoch, mAP_msmt))
+
+    #         print('Testing on unseen tasks')
+    #         print('Results on VC-Clothes')
+    #         evaluator.evaluate(test_loader_vcclothes, dataset_vcclothes.query, dataset_vcclothes.gallery, cmc_flag=True)
+    #         print('Results on Real28')
+    #         evaluator.evaluate(test_loader_real28, dataset_real28.query, dataset_real28.gallery, cmc_flag=True)
+    #         # evaluator.evaluate(test_loader_celeblight, dataset_celeblight.query, dataset_celeblight.gallery, cmc_flag=True)
+    #         print('Results on DeepChange')
+    #         evaluator.evaluate(test_loader_deepchange, dataset_deepchange.query, dataset_deepchange.gallery, cmc_flag=True)
 
     print('finished')
 
@@ -460,7 +464,7 @@ if __name__ == '__main__':
     # path
     working_dir = osp.dirname(osp.abspath(__file__))
     parser.add_argument('--data-dir', type=str, metavar='PATH',
-                        default=osp.join(working_dir, 'data'))
+                        default='/media/dustin/DATA/Research/2DReID/Datasets/')
     parser.add_argument('--logs-dir', type=str, metavar='PATH',
                         default=osp.join(working_dir, 'logs'))
     parser.add_argument('--rr-gpu', action='store_true',

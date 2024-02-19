@@ -1,1 +1,3 @@
-CUDA_VISIBLE_DEVICES=4,5 python continual_train.py --logs-dir /home/wenhang/PTKP/logs/ours
+#!/bin/bash
+
+CUDA_VISIBLE_DEVICES=0 python continual_train_CC.py
