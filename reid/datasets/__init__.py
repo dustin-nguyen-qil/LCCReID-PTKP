@@ -9,15 +9,15 @@ from .cuhk01 import CUHK01
 from .cuhk_sysu import CUHK_SYSU
 from .grid import GRID
 from .sensereid import SenseReID
-from .celeb import IncrementalSamples4Celeb
-from .celeblight import IncrementalSamples4CelebLight
-from .cocas import IncrementalSamples4Cocas
-from .deepchange import IncrementalSamples4DeepChange
-from .last import IncrementalSamples4LaST
-from .ltcc import IncrementalSamples4LTCC
-from .prcc import IncrementalSamples4PRCC
-from .real28 import IncrementalSamples4Real28
-from .vcclothes import IncrementalSamples4VCClothes
+from .celeb import  Celeb
+from .celeblight import  CelebLight
+from .cocas import  Cocas
+from .deepchange import  DeepChange
+from .last import  LaST
+from .ltcc import  LTCC
+from .prcc import  PRCC
+from .real28 import  Real28
+from .vcclothes import  VCClothes
 
 __factory = {
     'market1501': Market1501,
@@ -28,15 +28,15 @@ __factory = {
     'cuhk01': CUHK01,
     'grid': GRID,
     'sense': SenseReID,
-    'cocas': IncrementalSamples4Cocas,
-    'celeb': IncrementalSamples4Celeb,
-    'celeblight': IncrementalSamples4CelebLight,
-    'deepchange': IncrementalSamples4DeepChange,
-    'last': IncrementalSamples4LaST,
-    'ltcc': IncrementalSamples4LTCC,
-    'prcc': IncrementalSamples4PRCC,
-    'real28': IncrementalSamples4Real28,
-    'vcclothes': IncrementalSamples4VCClothes
+    'cocas':  Cocas,
+    'celeb':  Celeb,
+    'celeblight':  CelebLight,
+    'deepchange':  DeepChange,
+    'last':  LaST,
+    'ltcc':  LTCC,
+    'prcc':  PRCC,
+    'real28':  Real28,
+    'vcclothes':  VCClothes
 }
 
 

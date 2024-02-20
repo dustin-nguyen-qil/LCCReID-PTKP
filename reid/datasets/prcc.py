@@ -10,7 +10,7 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4PRCC(BaseImageDataset):
+class PRCC(BaseImageDataset):
     """
         PRCC dataset
     """
@@ -91,7 +91,7 @@ class IncrementalSamples4PRCC(BaseImageDataset):
                     clothes_id = clothes2label[osp.basename(pdir)]
                 else:
                     clothes_id = clothes2label[osp.basename(pdir)+osp.basename(img_path)[0]]
-                dataset.append((img_path, pid, camid, 0))
+                dataset.append((img_path, label, camid, 0))
                 pid2clothes[label, clothes_id] = 1            
         
         num_imgs = len(dataset)

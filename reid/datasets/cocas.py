@@ -10,7 +10,7 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4Cocas(BaseImageDataset):
+class Cocas(BaseImageDataset):
     """
         Cocas dataset
     """

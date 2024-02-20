@@ -10,7 +10,7 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4Real28(BaseImageDataset):
+class Real28(BaseImageDataset):
     """
         Real28 dataset, only used for testing
     """

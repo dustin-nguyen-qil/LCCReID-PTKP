@@ -9,7 +9,7 @@ import pickle
 import numpy as np
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4LTCC(BaseImageDataset):
+class LTCC(BaseImageDataset):
     """
         LTCC dataset
     """

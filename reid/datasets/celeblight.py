@@ -10,7 +10,7 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4CelebLight(BaseImageDataset):
+class CelebLight(BaseImageDataset):
     """
         Celebrities-ReID-Light dataset
     """

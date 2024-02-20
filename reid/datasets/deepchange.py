@@ -10,7 +10,7 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4DeepChange(BaseImageDataset):
+class DeepChange(BaseImageDataset):
     """
         DeepChange dataset
     """

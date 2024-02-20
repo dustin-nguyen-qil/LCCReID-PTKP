@@ -10,7 +10,7 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4VCClothes(BaseImageDataset):
+class VCClothes(BaseImageDataset):
     """
         VC-Clothes dataset
     """
@@ -157,8 +157,8 @@ class IncrementalSamples4VCClothes(BaseImageDataset):
 
 
 def VCClothesSameClothes(root='data', **kwargs):
-    return IncrementalSamples4VCClothes(root=root, mode='sc')
+    return VCClothes(root=root, mode='sc')
 
 
 def VCClothesClothesChanging(root='data', **kwargs):
-    return IncrementalSamples4VCClothes(root=root, mode='cc')
+    return VCClothes(root=root, mode='cc')

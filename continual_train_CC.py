@@ -181,7 +181,7 @@ def main_worker(args):
 
     # Train PRCC
     trainer = Trainer(model, num_classes_prcc, margin=args.margin)
-    for epoch in range(start_epoch, 50):
+    for epoch in range(start_epoch, args.epochs):
 
         train_loader_prcc.new_epoch()
         trainer.train(epoch, train_loader_prcc, None, optimizer, training_phase=1,
@@ -464,7 +464,7 @@ if __name__ == '__main__':
     # path
     working_dir = osp.dirname(osp.abspath(__file__))
     parser.add_argument('--data-dir', type=str, metavar='PATH',
-                        default='/media/dustin/DATA/Research/2DReID/Datasets/')
+                        default='/home/azakeri/reid/CC_Datasets/')
     parser.add_argument('--logs-dir', type=str, metavar='PATH',
                         default=osp.join(working_dir, 'logs'))
     parser.add_argument('--rr-gpu', action='store_true',

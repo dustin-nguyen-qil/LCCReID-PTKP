@@ -75,7 +75,7 @@ def select_replay_samples(model, dataset, training_phase=0, add_num=0, old_datas
 
     class_centers = [torch.stack(pid2features[pid]).mean(0) for pid in sorted(pid2features.keys())]
     class_centers = F.normalize(torch.stack(class_centers), dim=1)
-    select_pids = np.random.choice(labels_all, 250, replace=False)
+    select_pids = np.random.choice(labels_all, 50, replace=False)
     for pid in select_pids:
         feautures_single_pid = F.normalize(torch.stack(pid2features[pid]), dim=1, p=2)
         center_single_pid = class_centers[pid]

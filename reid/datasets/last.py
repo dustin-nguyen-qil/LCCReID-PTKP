@@ -10,13 +10,13 @@ import numpy as np
 import random
 from ..utils.data import BaseImageDataset
 
-class IncrementalSamples4LaST(BaseImageDataset):
+class LaST(BaseImageDataset):
     """
         LaST dataset
     """
     dataset_dir = 'LaST'
     def __init__(self, datasets_root, **kwargs):
-        super(IncrementalSamples4LaST, self).__init__()
+        super(LaST, self).__init__()
         self.dataset_dir = osp.join(datasets_root, self.dataset_dir)
         self.train_dir = osp.join(self.dataset_dir, 'train')
         self.val_query_dir = osp.join(self.dataset_dir, 'val', 'query')
